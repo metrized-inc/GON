@@ -13,7 +13,7 @@ nc = 1
 
 # training info
 lr = 1e-4
-batch_size = 64
+batch_size = 32
 nz = 48
 ngf = 32
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

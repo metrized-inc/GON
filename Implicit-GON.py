@@ -3,19 +3,30 @@ import torch.nn as nn
 import torchvision
 import numpy as np
 import os
+from torch.utils.data import Dataset
+import torchvision.transforms as T
+from PIL import Image
+
 
 plot_dir = 'imgs'
 os.makedirs(plot_dir, exist_ok=True)
 
 # image data
-dataset_name = 'fashion' # ['mnist', 'fashion']
-img_size = 28
-n_channels = 1
-img_coords = 2
+dataset_name = 'custom' # ['mnist', 'fashion', 'custom]
+# dataset_name = 'fashion'
+if dataset_name == 'custom':
+    data_path = r'E:\Metrized-Data\Sikorsky\material_classifier\sikorsky_only\combined\only_carbon\split_temp_2'
+    img_size = 64
+    n_channels = 3
+    img_coords = 2
+else:
+    img_size = 28
+    n_channels = 1
+    img_coords = 2
 
 # training info
-lr = 1e-4
-batch_size = 64
+lr = 1e-5
+batch_size = 16
 num_latent = 32
 hidden_features = 256
 num_layers = 4
@@ -88,17 +99,66 @@ def gon_sample(model, recent_zs, coords):
     model_input = torch.cat((coords, sample), dim=-1)
     return model(model_input)
 
+def load_custom_dataset(data_path):
+    train_path = os.path.join(data_path, 'train')
+    val_path = os.path.join(data_path, 'val')
+
+    train_names = os.listdir(train_path)
+    val_names = os.listdir(val_path)
+
+    train_img_paths = [os.path.join(train_path, name) for name in train_names]
+    val_img_paths = [os.path.join(val_path, name) for name in val_names]
+    return train_img_paths, val_img_paths
+
+class CustomDataset(Dataset):
+    def __init__(self, data_paths, transform):
+        self.data_paths = data_paths
+        self.transform = transform
+
+    def __getitem__(self, index):
+        image = Image.open(self.data_paths[index])
+        image = self.transform(image)
+        return image, 0
+
+    def __len__(self):
+        return len(self.data_paths)
+
+def _data_transforms_custom():
+    if n_channels == 1:
+        transform = T.Compose([
+            T.Resize(size=(img_size, img_size), interpolation=Image.Resampling.BICUBIC),
+            T.Grayscale(),
+            T.ToTensor()
+        ])
+    else:
+        transform = T.Compose([
+            T.Resize(size=(img_size, img_size), interpolation=Image.Resampling.BICUBIC),
+            T.ToTensor()
+        ])
+
+    return transform
+
+
 # load datasets
 if dataset_name == 'mnist':
-    dataset = torchvision.datasets.MNIST('data', train=True, download=True, transform=torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor()
+    dataset = torchvision.datasets.MNIST('data', train=True, download=True, transform=T.Compose([
+        T.ToTensor()
     ]))
 if dataset_name == 'fashion':
-    dataset = torchvision.datasets.FashionMNIST('data', train=True, download=True, transform=torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor()
+    dataset = torchvision.datasets.FashionMNIST('data', train=True, download=True, transform=T.Compose([
+        T.ToTensor()
     ]))
 
-train_loader = torch.utils.data.DataLoader(dataset, sampler=None, shuffle=True, batch_size=batch_size, drop_last=True)
+if dataset_name == 'custom':
+    transforms = _data_transforms_custom()
+    train_img_paths, val_img_paths = load_custom_dataset(data_path)
+    train_data = CustomDataset(train_img_paths, transforms)
+    valid_data = CustomDataset(val_img_paths, transforms)
+
+if dataset_name == 'custom':
+    train_loader = torch.utils.data.DataLoader(train_data, sampler=None, shuffle=True, batch_size=batch_size, drop_last=True)
+else:
+    train_loader = torch.utils.data.DataLoader(dataset, sampler=None, shuffle=True, batch_size=batch_size, drop_last=True)
 train_iterator = iter(cycle(train_loader))
 
 # define GON architecture, for example gon_shape = [34, 256, 256, 256, 256, 1]
@@ -111,7 +171,7 @@ print(f'> Number of parameters {len(torch.nn.utils.parameters_to_vector(F.parame
 
 recent_zs = []
 
-for step in range(501):
+for step in range(4001):
     # sample a batch of data
     x, t = next(train_iterator)
     x, t = x.to(device), t.to(device)
@@ -143,9 +203,9 @@ for step in range(501):
         torchvision.utils.save_image(torch.clamp(g, 0, 1).permute(0,2,1).reshape(-1, n_channels, img_size, img_size), 
             f'imgs/recon_{step}.png', nrow=int(np.sqrt(batch_size)), padding=0)
 
-        # plot interpolations
-        torchvision.utils.save_image(torch.clamp(slerp_batch(F, z.data, c), 0, 1).permute(0,2,1).reshape(-1, n_channels, img_size, img_size), 
-            f'imgs/slerp_{step}.png', nrow=int(np.sqrt(batch_size)), padding=0)
+        # # plot interpolations
+        # torchvision.utils.save_image(torch.clamp(slerp_batch(F, z.data, c), 0, 1).permute(0,2,1).reshape(-1, n_channels, img_size, img_size), 
+        #     f'imgs/slerp_{step}.png', nrow=int(np.sqrt(batch_size)), padding=0)
 
         # plot samples
         torchvision.utils.save_image(torch.clamp(gon_sample(F, recent_zs, c), 0, 1).permute(0,2,1).reshape(-1, n_channels, img_size, img_size), 
