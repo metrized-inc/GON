@@ -101,14 +101,14 @@ def gon_sample(model, recent_zs, coords):
 
 def load_custom_dataset(data_path):
     train_path = os.path.join(data_path, 'train')
-    val_path = os.path.join(data_path, 'val')
+    # val_path = os.path.join(data_path, 'val')
 
     train_names = os.listdir(train_path)
-    val_names = os.listdir(val_path)
+    # val_names = os.listdir(val_path)
 
     train_img_paths = [os.path.join(train_path, name) for name in train_names]
-    val_img_paths = [os.path.join(val_path, name) for name in val_names]
-    return train_img_paths, val_img_paths
+    # val_img_paths = [os.path.join(val_path, name) for name in val_names]
+    return train_img_paths#, val_img_paths
 
 class CustomDataset(Dataset):
     def __init__(self, data_paths, transform):
@@ -151,9 +151,10 @@ if dataset_name == 'fashion':
 
 if dataset_name == 'custom':
     transforms = _data_transforms_custom()
-    train_img_paths, val_img_paths = load_custom_dataset(data_path)
+    # train_img_paths, val_img_paths = load_custom_dataset(data_path)
+    train_img_paths = load_custom_dataset(data_path)
     train_data = CustomDataset(train_img_paths, transforms)
-    valid_data = CustomDataset(val_img_paths, transforms)
+    #valid_data = CustomDataset(val_img_paths, transforms)
 
 if dataset_name == 'custom':
     train_loader = torch.utils.data.DataLoader(train_data, sampler=None, shuffle=True, batch_size=batch_size, drop_last=True)
